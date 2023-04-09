@@ -21,6 +21,8 @@ class ImageProcessor:
     def __init__(self):
         self.input_dir = ""
 
+        self.output_images = []
+
     def png_add_background(self, img, fill_color):
         img = img.convert("RGBA")  # it had mode P after DL it from OP
         if img.mode in ('RGBA', 'LA'):
@@ -92,14 +94,16 @@ class ImageProcessor:
             images_inout.append([input_img_dir, output_img_dir])
 
         completed = 0
-        progress(0, desc="Processing")
+        progress(0, desc="Starting")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [executor.submit(self.convert_to_optimized_jpeg, source, target) for [source, target] in images_inout]
             for _ in concurrent.futures.as_completed(futures):
                 completed = completed + 1
-                progress(completed / len(futures))
+                progress(completed / len(futures), desc=f"Processing ({completed}/{len(futures)})")
 
-        return [image_inout[1] for image_inout in images_inout]
+        self.output_images = [image_inout[1] for image_inout in images_inout]
+
+        return self.output_images[:12]
 
 
     def start_ui(self):
@@ -117,7 +121,7 @@ class ImageProcessor:
                         interactive=True,
                     )
                     submit_btn = gr.Button(
-                        label="处理",
+                        "处理",
                         variant="primary"
                     )
                 with gr.Column(min_width=600):
@@ -127,6 +131,13 @@ class ImageProcessor:
                     output.style(
                         grid=4,
                     )
+                    with gr.Row():
+                        prev_btn = gr.Button(
+                            "上一页",
+                        )
+                        next_btn = gr.Button(
+                            "下一页",
+                        )
 
             submit_btn.click(
                 fn=self.png_to_jpg,
