@@ -56,7 +56,7 @@ class ImageProcessor:
 
         img.close()
 
-    def png_to_jpg(self, dir):
+    def png_to_jpg(self, dir, progress=gr.Progress()):
 
         self.input_dir = dir
 
@@ -87,10 +87,13 @@ class ImageProcessor:
 
             images_inout.append([input_img_dir, output_img_dir])
 
-
+        completed = 0
+        progress(0, desc="Processing")
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for [source, target] in images_inout:
-                executor.submit(self.convert_to_optimized_jpeg, source, target)
+            futures = [executor.submit(self.convert_to_optimized_jpeg, source, target) for [source, target] in images_inout]
+            for _ in concurrent.futures.as_completed(futures):
+                completed = completed + 1
+                progress(completed / len(futures))
 
         return [image_inout[1] for image_inout in images_inout]
 
@@ -102,7 +105,6 @@ class ImageProcessor:
                 """
             # 图片压缩
             """)
-
 
             with gr.Row():
                 with gr.Column():
@@ -127,9 +129,11 @@ class ImageProcessor:
                 inputs=[
                     dir
                 ],
-                outputs=output
+                outputs=output,
+                queue=True
             )
 
+        demo.queue()
         demo.launch(
             server_name="0.0.0.0",
         )
