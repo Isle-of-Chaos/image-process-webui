@@ -11,6 +11,10 @@ from io import BytesIO
 
 import concurrent.futures
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
 
 class ImageProcessor:
 
@@ -116,7 +120,7 @@ class ImageProcessor:
                         label="处理",
                         variant="primary"
                     )
-                with gr.Column():
+                with gr.Column(min_width=600):
                     output = gr.Gallery(
                         show_label=False,
                     )
@@ -136,6 +140,11 @@ class ImageProcessor:
         demo.queue()
         demo.launch(
             server_name="0.0.0.0",
+            inbrowser=True,
+            debug=True,
+            enable_queue=True,
+            prevent_thread_lock=True,
+            show_error=True
         )
 
 
