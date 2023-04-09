@@ -5,6 +5,12 @@ from PIL import Image
 import os
 import gradio as gr
 
+from io import BytesIO
+
+# import mozjpeg_lossless_optimization
+
+import concurrent.futures
+
 
 class ImageProcessor:
 
@@ -35,6 +41,21 @@ class ImageProcessor:
         print(img.size)
         return img
 
+    def convert_to_optimized_jpeg(self, input_path, output_path):
+
+        img = Image.open(input_path)
+
+        fill_color = (0, 0, 0)  # your new background color
+
+        if input_path.endswith('.png'):
+            img = self.png_add_background(img, fill_color)
+
+        img = self.resize_image(img, 3000, 3000)
+
+        img.save(output_path, 'jpeg', quality=80)
+
+        img.close()
+
     def png_to_jpg(self, dir):
 
         self.input_dir = dir
@@ -48,31 +69,30 @@ class ImageProcessor:
         output_dir = input_dir / f"out/{now_time}/"
         output_dir.mkdir(parents=True, exist_ok=True)
 
+
         output_images = []
 
+        images_inout = []
+
         for filename in os.listdir(input_dir):
+
+
 
             if not filename.endswith('.jpg') and not filename.endswith('.jpeg') and not filename.endswith('.png'):
                 continue
 
-            img = Image.open(os.path.join(input_dir, filename))
-
-            fill_color = (0, 0, 0)  # your new background color
-
-            if filename.endswith('.png'):
-                img = self.png_add_background(img, fill_color)
-
-            img = self.resize_image(img, 3000, 3000)
-
+            input_img_dir = os.path.join(input_dir, filename)
             new_filename = filename.replace('.png', '.jpg')
+            output_img_dir = os.path.join(output_dir, new_filename)
 
-            output_filename = os.path.join(output_dir, new_filename)
-            img.save(output_filename, 'jpeg')
-            output_images.append(output_filename)
+            images_inout.append([input_img_dir, output_img_dir])
 
-            img.close()
 
-        return output_images
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for [source, target] in images_inout:
+                executor.submit(self.convert_to_optimized_jpeg, source, target)
+
+        return [image_inout[1] for image_inout in images_inout]
 
 
     def start_ui(self):
