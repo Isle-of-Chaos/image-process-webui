@@ -24,6 +24,7 @@ class ImageProcessor:
         self.page_number = 0
 
         self.config = {
+            'quality': 80,
             'is_resize': True,
             'max_width': 3000,
             'max_height': 3000,
@@ -65,11 +66,11 @@ class ImageProcessor:
         if input_path.endswith('.png'):
             img = self.png_add_background(img, fill_color)
 
-        img.save(output_path, 'jpeg', quality=80)
+        img.save(output_path, 'jpeg', quality=self.config['quality'])
 
         img.close()
 
-    def convert(self, dir, is_resize, max_width, max_height, progress=gr.Progress()):
+    def convert(self, dir, quality, is_resize, max_width, max_height, progress=gr.Progress()):
 
         self.input_dir = dir
 
@@ -86,6 +87,7 @@ class ImageProcessor:
 
         images_inout = []
 
+        self.config['quality'] = quality
         self.config['is_resize'] = is_resize
         self.config['max_width'] = max_width
         self.config['max_height'] = max_height
@@ -163,8 +165,14 @@ class ImageProcessor:
                         interactive=True,
                     )
                     with gr.Row():
+                        quality = gr.Slider(
+                            label="质量",
+                            value=self.config['quality'],
+                            precision=0,
+                        )
+                    with gr.Row():
                         is_resize = gr.Checkbox(
-                            label="是否压缩",
+                            label="是否缩放",
                             value=self.config['is_resize'],
                         )
                         max_width = gr.Number(
@@ -238,7 +246,7 @@ class ImageProcessor:
             submit_btn.click(
                 fn=self.convert,
                 inputs=[
-                    dir, is_resize, max_width, max_height
+                    dir, quality, is_resize, max_width, max_height
                 ],
                 outputs=outputs,
                 queue=True
