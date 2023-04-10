@@ -3,13 +3,10 @@ import time
 from pathlib import Path
 
 from PIL import Image
+
 Image.MAX_IMAGE_PIXELS = None
 import os
 import gradio as gr
-
-from io import BytesIO
-
-# import mozjpeg_lossless_optimization
 
 import concurrent.futures
 
@@ -25,6 +22,12 @@ class ImageProcessor:
 
         self.output_images = []
         self.page_number = 0
+
+        self.config = {
+            'is_resize': True,
+            'max_width': 3000,
+            'max_height': 3000,
+        }
 
     def png_add_background(self, img, fill_color):
         img = img.convert("RGBA")  # it had mode P after DL it from OP
@@ -54,19 +57,19 @@ class ImageProcessor:
 
         img = Image.open(input_path)
 
-        img = self.resize_image(img, 3000, 3000)
+        if self.config['is_resize']:
+            img = self.resize_image(img, self.config['max_width'], self.config['max_height'])
 
         fill_color = (0, 0, 0)  # your new background color
 
         if input_path.endswith('.png'):
             img = self.png_add_background(img, fill_color)
 
-
         img.save(output_path, 'jpeg', quality=80)
 
         img.close()
 
-    def png_to_jpg(self, dir, progress=gr.Progress()):
+    def convert(self, dir, is_resize, max_width, max_height, progress=gr.Progress()):
 
         self.input_dir = dir
 
@@ -79,14 +82,15 @@ class ImageProcessor:
         output_dir = input_dir / f"out/{now_time}/"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-
         output_images = []
 
         images_inout = []
 
+        self.config['is_resize'] = is_resize
+        self.config['max_width'] = max_width
+        self.config['max_height'] = max_height
+
         for filename in os.listdir(input_dir):
-
-
 
             if not filename.endswith('.jpg') and not filename.endswith('.jpeg') and not filename.endswith('.png'):
                 continue
@@ -100,7 +104,8 @@ class ImageProcessor:
         completed = 0
         progress((0, len(images_inout)), desc="Starting")
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = [executor.submit(self.convert_to_optimized_jpeg, source, target) for [source, target] in images_inout]
+            futures = [executor.submit(self.convert_to_optimized_jpeg, source, target) for [source, target] in
+                       images_inout]
             for _ in concurrent.futures.as_completed(futures):
                 completed = completed + 1
                 progress((completed, len(futures)), desc=f"Processing")
@@ -139,9 +144,9 @@ class ImageProcessor:
         is_prev_disable = self.page_number == 0
         is_next_disable = self.page_number == total_page - 1
 
-        return gr.update(interactive=not is_prev_disable), gr.update(value=self.page_number, maximum=total_page-1, interactive=not is_prev_disable or not is_next_disable), gr.update(interactive=not is_next_disable), self.get_page()
-
-
+        return gr.update(interactive=not is_prev_disable), gr.update(value=self.page_number, maximum=total_page - 1,
+                                                                     interactive=not is_prev_disable or not is_next_disable), gr.update(
+            interactive=not is_next_disable), self.get_page()
 
     def start_ui(self):
 
@@ -157,6 +162,21 @@ class ImageProcessor:
                         label="本地图片文件夹路径",
                         interactive=True,
                     )
+                    with gr.Row():
+                        is_resize = gr.Checkbox(
+                            label="是否压缩",
+                            value=self.config['is_resize'],
+                        )
+                        max_width = gr.Number(
+                            label="最大宽度",
+                            value=self.config['max_width'],
+                            precision=0,
+                        )
+                        max_height = gr.Number(
+                            label="最大高度",
+                            value=self.config['max_height'],
+                            precision=0,
+                        )
                     submit_btn = gr.Button(
                         "处理",
                         variant="primary"
@@ -188,11 +208,11 @@ class ImageProcessor:
                     )
 
             outputs = [
-                    prev_btn,
-                    page_number,
-                    next_btn,
-                    output,
-                ]
+                prev_btn,
+                page_number,
+                next_btn,
+                output,
+            ]
 
             prev_btn.click(
                 fn=self.prev_page,
@@ -216,9 +236,9 @@ class ImageProcessor:
             )
 
             submit_btn.click(
-                fn=self.png_to_jpg,
+                fn=self.convert,
                 inputs=[
-                    dir
+                    dir, is_resize, max_width, max_height
                 ],
                 outputs=outputs,
                 queue=True
@@ -233,8 +253,6 @@ class ImageProcessor:
             prevent_thread_lock=True,
             show_error=True
         )
-
-
 
 
 input_dir = r'C:\Users\12727\Downloads\selected\grid-0000.png'
