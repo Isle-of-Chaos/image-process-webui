@@ -1,4 +1,5 @@
 import datetime
+import time
 from pathlib import Path
 
 from PIL import Image
@@ -22,6 +23,7 @@ class ImageProcessor:
         self.input_dir = ""
 
         self.output_images = []
+        self.page_number = 0
 
     def png_add_background(self, img, fill_color):
         img = img.convert("RGBA")  # it had mode P after DL it from OP
@@ -94,21 +96,54 @@ class ImageProcessor:
             images_inout.append([input_img_dir, output_img_dir])
 
         completed = 0
-        progress(0, desc="Starting")
+        progress((0, len(images_inout)), desc="Starting")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = [executor.submit(self.convert_to_optimized_jpeg, source, target) for [source, target] in images_inout]
             for _ in concurrent.futures.as_completed(futures):
                 completed = completed + 1
-                progress(completed / len(futures), desc=f"Processing ({completed}/{len(futures)})")
+                progress((completed, len(futures)), desc=f"Processing")
 
         self.output_images = [image_inout[1] for image_inout in images_inout]
+        self.page_number = 0
 
-        return self.output_images[:12]
+        return self.update_page('slider', 0)
+
+    def get_page(self):
+        start_index = self.page_number * 12
+        end_index = start_index + 12
+        return self.output_images[start_index:end_index]
+
+    def prev_page(self):
+        return self.update_page('prev', 0)
+
+    def next_page(self):
+        return self.update_page('next', 0)
+
+    def slider_page(self, page_number):
+        return self.update_page('slider', page_number)
+
+    def update_page(self, type, page_number):
+
+        total_page = len(self.output_images) // 12 + 1
+
+        if type == 'prev':
+            self.page_number = self.page_number - 1
+        elif type == 'next':
+            self.page_number = self.page_number + 1
+        elif type == 'slider':
+            if 0 <= page_number < total_page:
+                self.page_number = page_number
+
+        is_prev_disable = self.page_number == 0
+        is_next_disable = self.page_number == total_page - 1
+
+        return gr.update(interactive=not is_prev_disable), gr.update(value=self.page_number, maximum=total_page-1, interactive=not is_prev_disable or not is_next_disable), gr.update(interactive=not is_next_disable), self.get_page()
+
 
 
     def start_ui(self):
 
-        with gr.Blocks() as demo:
+        with gr.Blocks(css="#slider .default {display: none;}") as demo:
             gr.Markdown(
                 """
             # 图片压缩
@@ -125,26 +160,65 @@ class ImageProcessor:
                         variant="primary"
                     )
                 with gr.Column(min_width=600):
+                    with gr.Row():
+                        prev_btn = gr.Button(
+                            "上一页",
+                            interactive=False,
+                        )
+                        prev_btn.style(
+                            size='sm'
+                        )
+                        page_number = gr.Slider(
+                            label="页数",
+                            elem_id='slider',
+                            interactive=False,
+                        )
+                        next_btn = gr.Button(
+                            "下一页",
+                            interactive=False,
+                        )
+
                     output = gr.Gallery(
                         show_label=False,
                     )
                     output.style(
                         grid=4,
                     )
-                    with gr.Row():
-                        prev_btn = gr.Button(
-                            "上一页",
-                        )
-                        next_btn = gr.Button(
-                            "下一页",
-                        )
+
+            outputs = [
+                    prev_btn,
+                    page_number,
+                    next_btn,
+                    output,
+                ]
+
+            prev_btn.click(
+                fn=self.prev_page,
+                inputs=[],
+                outputs=outputs,
+                show_progress=False,
+            )
+            page_number.release(
+                fn=self.slider_page,
+                inputs=[
+                    page_number,
+                ],
+                outputs=outputs,
+                show_progress=False,
+            )
+            next_btn.click(
+                fn=self.next_page,
+                inputs=[],
+                outputs=outputs,
+                show_progress=False,
+            )
 
             submit_btn.click(
                 fn=self.png_to_jpg,
                 inputs=[
                     dir
                 ],
-                outputs=output,
+                outputs=outputs,
                 queue=True
             )
 
