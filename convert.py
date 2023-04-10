@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
 import os
 import gradio as gr
 
@@ -236,8 +237,10 @@ class ImageProcessor:
 
 
 
-input_dir = r'/Users/ciaochaos/Downloads/test_images'
+input_dir = r'C:\Users\12727\Downloads\selected\grid-0000.png'
+output_dir = r'C:\Users\12727\Downloads\selected\grid-0000.jpg'
 
 if __name__ == '__main__':
     process = ImageProcessor()
     process.start_ui()
+    # process.convert_to_optimized_jpeg(input_dir, output_dir)
