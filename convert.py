@@ -32,9 +32,9 @@ class ImageProcessor:
 
     def png_add_background(self, img, fill_color):
         img = img.convert("RGBA")  # it had mode P after DL it from OP
-        # if img.mode in ('RGBA', 'LA'):
-        background = Image.new(img.mode[:-1], img.size, fill_color)
-        background.paste(img, img.split()[-1])  # omit transparency
+        if img.mode in ('RGBA', 'LA'):
+            background = Image.new(img.mode[:-1], img.size, fill_color)
+            background.paste(img, img.split()[-1])  # omit transparency
         img = background
 
         img.convert("RGB")
@@ -61,12 +61,16 @@ class ImageProcessor:
         if self.config['is_resize']:
             img = self.resize_image(img, self.config['max_width'], self.config['max_height'])
 
-        fill_color = (0, 0, 0)  # your new background color
-
+        fill_color = (0, 0, 0)
         if input_path.endswith('.png'):
             img = self.png_add_background(img, fill_color)
 
-        img.save(output_path, 'jpeg', quality=self.config['quality'])
+        img.save(
+            output_path,
+            'jpeg',
+            quality=self.config['quality'],
+            optimize=True,
+        )
 
         img.close()
 
