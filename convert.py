@@ -11,6 +11,14 @@ import gradio as gr
 import concurrent.futures
 
 import logging
+from vfx import ImageVFX
+from io import BytesIO
+
+from PIL import Image  # pip install pillow
+import mozjpeg_lossless_optimization
+
+import concurrent.futures
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -28,6 +36,7 @@ class ImageProcessor:
             'is_resize': True,
             'max_width': 3000,
             'max_height': 3000,
+            'is_convert':False,
         }
 
     def png_add_background(self, img, fill_color):
@@ -54,27 +63,44 @@ class ImageProcessor:
         print(img.size)
         return img
 
-    def convert_to_optimized_jpeg(self, input_path, output_path):
+    # def convert_to_optimized_jpeg(self, input_path, output_path):
+    #
+    #     img = Image.open(input_path)
+    #
+    #     if self.config['is_resize']:
+    #         img = self.resize_image(img, self.config['max_width'], self.config['max_height'])
+    #
+    #     if self.config['is_convert']:
+    #         img =ImageVFX.convert_to_grayscale(img)
+    #         print("123")
+    #
+    #     fill_color = (0, 0, 0)
+    #     if input_path.endswith('.png'):
+    #         img = self.png_add_background(img, fill_color)
+    #
+    #     img.save(
+    #         output_path,
+    #         'jpeg',
+    #         quality=self.config['quality'],
+    #         optimize=True,
+    #     )
+    #
+    #     img.close()
+    def convert_to_optimized_jpeg(self,input_path, output_path):
+        jpeg_io = BytesIO()
 
-        img = Image.open(input_path)
+        with Image.open(input_path, "r") as image:
+            image.convert("RGB").save(jpeg_io, format="JPEG", quality=85)
 
-        if self.config['is_resize']:
-            img = self.resize_image(img, self.config['max_width'], self.config['max_height'])
+        jpeg_io.seek(0)
+        jpeg_bytes = jpeg_io.read()
 
-        fill_color = (0, 0, 0)
-        if input_path.endswith('.png'):
-            img = self.png_add_background(img, fill_color)
+        optimized_jpeg_bytes = mozjpeg_lossless_optimization.optimize(jpeg_bytes)
 
-        img.save(
-            output_path,
-            'jpeg',
-            quality=self.config['quality'],
-            optimize=True,
-        )
+        with open(output_path, "wb") as output_file:
+            output_file.write(optimized_jpeg_bytes)
 
-        img.close()
-
-    def convert(self, dir, quality, is_resize, max_width, max_height, progress=gr.Progress()):
+    def convert(self, dir, quality, is_resize,is_convert, max_width, max_height, progress=gr.Progress()):
 
         self.input_dir = dir
 
@@ -95,6 +121,7 @@ class ImageProcessor:
         self.config['is_resize'] = is_resize
         self.config['max_width'] = max_width
         self.config['max_height'] = max_height
+        self.config['is_convert'] = is_convert
 
         for filename in os.listdir(input_dir):
 
@@ -179,6 +206,10 @@ class ImageProcessor:
                             label="是否缩放",
                             value=self.config['is_resize'],
                         )
+                        is_convert = gr.Checkbox(
+                            label="是否黑白",
+                            value=self.config['is_convert'],
+                        )
                         max_width = gr.Number(
                             label="最大宽度",
                             value=self.config['max_width'],
@@ -250,7 +281,7 @@ class ImageProcessor:
             submit_btn.click(
                 fn=self.convert,
                 inputs=[
-                    dir, quality, is_resize, max_width, max_height
+                    dir, quality, is_resize,is_convert, max_width, max_height
                 ],
                 outputs=outputs,
                 queue=True
@@ -259,6 +290,7 @@ class ImageProcessor:
         demo.queue()
         demo.launch(
             server_name="0.0.0.0",
+            server_port=6969,
             inbrowser=True,
             debug=True,
             enable_queue=True,
